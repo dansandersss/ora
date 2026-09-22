@@ -1,100 +1,18 @@
-import { useEffect } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, {
-  interpolateColor,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import { Pressable, Text, View } from 'react-native';
 
-import ArrowIcon from '@/../assets/images/arrow.svg';
-import { colors, radii, spacing } from '@/theme/tokens';
-
-type PaginationDotProps = {
-  active: boolean;
-  index: number;
-  onPress: (index: number) => void;
-};
-
-function PaginationDot({ active, index, onPress }: PaginationDotProps) {
-  const activeProgress = useSharedValue(active ? 1 : 0);
-
-  useEffect(() => {
-    activeProgress.value = withTiming(active ? 1 : 0, { duration: 250 });
-  }, [active, activeProgress]);
-
-  const style = useAnimatedStyle(() => {
-    return {
-      backgroundColor: interpolateColor(activeProgress.value, [0, 1], ['transparent', colors.gold]),
-      transform: [{ scale: 1 + activeProgress.value * 0.15 }],
-    };
-  });
-
-  return (
-    <Pressable accessibilityLabel={`Mergi la pagina ${index + 1}`} hitSlop={10} onPress={() => onPress(index)}>
-      <Animated.View style={[styles.dot, style]} />
+type Props = { activeIndex: number; onNext: () => void; onSelectPage: (index: number) => void };
+export function OnboardingControls({ activeIndex, onNext, onSelectPage }: Props) {
+  return <View className="h-[64px] flex-row items-center justify-between">
+    <Pressable accessibilityRole="button" accessibilityLabel="Pagina precedentă" disabled={activeIndex === 0} onPress={() => onSelectPage(activeIndex - 1)} className="h-[44px] w-[72px] justify-center">
+      {activeIndex > 0 && <Text className="font-inter text-xs text-ora-secondary">Înapoi</Text>}
     </Pressable>
-  );
-}
-
-type OnboardingControlsProps = {
-  activeIndex: number;
-  onNext: () => void;
-  onSelectPage: (index: number) => void;
-};
-
-export function OnboardingControls({ activeIndex, onNext, onSelectPage }: OnboardingControlsProps) {
-  return (
-    <View style={styles.container}>
-      <View style={styles.buttonPlaceholder} />
-      <View accessibilityLabel="Pagina de onboarding" style={styles.pagination}>
-        {[0, 1, 2].map((index) => (
-          <PaginationDot active={activeIndex === index} index={index} key={index} onPress={onSelectPage} />
-        ))}
-      </View>
-      <Pressable
-        accessibilityLabel="Continuă"
-        accessibilityRole="button"
-        onPress={onNext}
-        style={({ pressed }) => [styles.nextButton, pressed && styles.nextButtonPressed]}>
-        <ArrowIcon height={23} width={31} />
-      </Pressable>
+    <View className="flex-row" accessibilityLabel={`Pagina ${activeIndex + 1} din 3`}>
+      {[0, 1, 2].map(index => <Pressable key={index} accessibilityRole="button" accessibilityLabel={`Mergi la pagina ${index + 1}`} accessibilityState={{ selected: activeIndex === index }} onPress={() => onSelectPage(index)} className="h-[44px] w-[28px] items-center justify-center">
+        <View className={`h-[9px] w-[9px] rounded-full border border-ora-gold ${activeIndex === index ? 'bg-ora-gold' : 'bg-transparent'}`} />
+      </Pressable>)}
     </View>
-  );
+    <Pressable accessibilityRole="button" accessibilityLabel={activeIndex === 2 ? 'Începe' : 'Continuă'} onPress={onNext} className="h-[44px] w-[72px] items-end justify-center">
+      <Text className="font-inter text-xs text-ora-gold">{activeIndex === 2 ? 'Începe' : 'Continuă'}</Text>
+    </Pressable>
+  </View>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  pagination: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.two,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderWidth: 1,
-    borderColor: colors.gold,
-    borderRadius: radii.full,
-  },
-  nextButton: {
-    width: 46,
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.gold,
-    borderRadius: radii.full,
-  },
-  nextButtonPressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.98 }],
-  },
-  buttonPlaceholder: {
-    width: 46,
-    height: 46,
-  },
-});

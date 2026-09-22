@@ -1,7 +1,7 @@
 /* Reanimated shared values are intentionally mutated by UI-thread gesture worklets. */
 /* eslint-disable react-hooks/immutability, react-hooks/refs */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { AppState, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -23,30 +23,32 @@ import { onboardingSlides } from '@/components/onboarding/onboarding-data';
 import { OnboardingHeader } from '@/components/onboarding/OnboardingHeader';
 import { OnboardingSlide } from '@/components/onboarding/OnboardingSlide';
 import { useHasSplashCompleted } from '@/lib/startup-context';
-import { colors, duration, spacing } from '@/theme/tokens';
+import { EntryAmbientBackground } from '@/components/backgrounds/PremiumAnimatedBackground';
+import { GlassBlurProvider } from '@/components/ui/GlassSurface';
+import { duration, spacing } from '@/theme/tokens';
 
 const AUTO_ADVANCE_INTERVAL = 4500;
 const SWIPE_DISTANCE_RATIO = 0.18;
 const SWIPE_VELOCITY_THRESHOLD = 700;
 const TRANSITION_DURATION = 420;
-const EDGE_RESISTANCE = 0.18;
 const ENTRANCE_DURATION = 650;
 const MOTION_EASING = Easing.bezier(0.22, 1, 0.36, 1);
-const VIRTUAL_SLIDES = [2, 0, 1, 2, 0] as const;
+const VIRTUAL_SLIDES = [0, 1, 2] as const;
 
 type OnboardingScreenProps = {
-  onComplete: () => void;
+  onComplete: () => void | Promise<void>;
 };
 
 type SlideLayerProps = {
   index: number;
+  active: boolean;
   offset: SharedValue<number>;
   reduceMotion: boolean;
   slideIndex: number;
   width: number;
 };
 
-function SlideLayer({ index, offset, reduceMotion, slideIndex, width }: SlideLayerProps) {
+function SlideLayer({ index, active, offset, reduceMotion, slideIndex, width }: SlideLayerProps) {
   const style = useAnimatedStyle(() => {
     const position = (offset.value + index * width) / width;
     return {
@@ -59,39 +61,33 @@ function SlideLayer({ index, offset, reduceMotion, slideIndex, width }: SlideLay
   });
 
   return (
-    <Animated.View style={[styles.slideLayer, { width }, style]}>
+    <Animated.View accessibilityElementsHidden={!active} importantForAccessibility={active ? 'auto' : 'no-hide-descendants'} aria-hidden={!active} style={[{ position: 'absolute', top: 0, bottom: 0, left: 0, width, pointerEvents: active ? 'auto' : 'none' }, style]}>
       <OnboardingSlide slide={onboardingSlides[slideIndex]} />
     </Animated.View>
   );
 }
 
 export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
-  const { width } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const width = Math.min(windowWidth, 430);
   const insets = useSafeAreaInsets();
   const splashComplete = useHasSplashCompleted();
   const reduceMotion = useReducedMotion();
-  const [pageIndex, setPageIndex] = useState(1);
+  const [pageIndex, setPageIndex] = useState(0);
   const [timerVersion, setTimerVersion] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const transitionLocked = useRef(false);
   const completionLocked = useRef(false);
-  const offset = useSharedValue(-width);
+  const offset = useSharedValue(0);
   const gestureStart = useSharedValue(0);
   const entrance = useSharedValue(0);
   const controlsEntrance = useSharedValue(0);
   const currentIndex = VIRTUAL_SLIDES[pageIndex];
 
-  const finishTransition = useCallback((settledPage: number) => {
-    if (settledPage === 0) {
-      offset.value = -3 * width;
-      setPageIndex(3);
-    } else if (settledPage === VIRTUAL_SLIDES.length - 1) {
-      offset.value = -width;
-      setPageIndex(1);
-    }
+  const finishTransition = useCallback(() => {
     transitionLocked.current = false;
-  }, [offset, width]);
+  }, []);
 
   const goToVirtualPage = useCallback((target: number, manual = false) => {
     const nextPage = Math.max(0, Math.min(VIRTUAL_SLIDES.length - 1, target));
@@ -116,13 +112,13 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       goToVirtualPage(pageIndex, manual);
       return;
     }
-    goToVirtualPage(slideIndex + 1, manual);
+    goToVirtualPage(slideIndex, manual);
   }, [currentIndex, goToVirtualPage, pageIndex]);
 
-  const finishOnboarding = useCallback(() => {
+  const finishOnboarding = useCallback(async () => {
     if (completionLocked.current) return;
     completionLocked.current = true;
-    onComplete();
+    try { await onComplete(); } finally { completionLocked.current = false; }
   }, [onComplete]);
 
   useEffect(() => {
@@ -133,7 +129,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
         easing: MOTION_EASING,
       },
       (finished) => {
-        if (finished) runOnJS(finishTransition)(pageIndex);
+        if (finished) runOnJS(finishTransition)();
       },
     );
   }, [finishTransition, offset, pageIndex, reduceMotion, width]);
@@ -153,29 +149,26 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   }, []);
 
   useEffect(() => {
-    if (!splashComplete || !isAppActive || isDragging) return;
+    if (!splashComplete || !isAppActive || isDragging || pageIndex === VIRTUAL_SLIDES.length - 1) return;
     const timer = setTimeout(() => goToVirtualPage(pageIndex + 1), AUTO_ADVANCE_INTERVAL);
     return () => clearTimeout(timer);
   }, [goToVirtualPage, isAppActive, isDragging, pageIndex, splashComplete, timerVersion]);
 
+  const unlockTransition = useCallback(() => { transitionLocked.current = false; }, []);
+
   const panGesture = Gesture.Pan()
     .activeOffsetX([-12, 12])
     .failOffsetY([-18, 18])
-    .onBegin(() => {
+    .onStart(() => {
       cancelAnimation(offset);
       gestureStart.value = offset.value;
       runOnJS(setIsDragging)(true);
+      runOnJS(unlockTransition)();
     })
     .onUpdate((event) => {
       const proposed = gestureStart.value + event.translationX;
       const minimum = -(VIRTUAL_SLIDES.length - 1) * width;
-      if (proposed > 0) {
-        offset.value = proposed * EDGE_RESISTANCE;
-      } else if (proposed < minimum) {
-        offset.value = minimum + (proposed - minimum) * EDGE_RESISTANCE;
-      } else {
-        offset.value = proposed;
-      }
+      offset.value = Math.max(minimum, Math.min(0, proposed));
     })
     .onEnd((event) => {
       const passedDistance = Math.abs(event.translationX) >= width * SWIPE_DISTANCE_RATIO;
@@ -187,30 +180,37 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           : event.translationX < 0 ? 1 : -1;
       const target = passedDistance || passedVelocity ? pageIndex + direction : pageIndex;
       runOnJS(goToVirtualPage)(target, true);
+    })
+    .onFinalize((_event, success) => {
+      if (!success) runOnJS(goToVirtualPage)(pageIndex, true);
     });
 
-  const headerStyle = useAnimatedStyle(() => ({ opacity: entrance.value }));
+  const headerStyle = useAnimatedStyle(() => ({ opacity: 0.9 + entrance.value * 0.1 }));
   const contentEntranceStyle = useAnimatedStyle(() => ({
-    opacity: entrance.value,
+    opacity: 0.9 + entrance.value * 0.1,
     transform: [{ translateY: (1 - entrance.value) * (reduceMotion ? 0 : 10) }],
   }));
   const controlsStyle = useAnimatedStyle(() => ({
-    opacity: controlsEntrance.value,
+    opacity: 0.9 + controlsEntrance.value * 0.1,
     transform: [{ translateY: (1 - controlsEntrance.value) * (reduceMotion ? 0 : 8) }],
   }));
 
-  const handleNext = () => goToVirtualPage(pageIndex + 1, true);
+  const handleNext = () => currentIndex === 2 ? void finishOnboarding() : goToVirtualPage(pageIndex + 1, true);
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.header, { paddingTop: insets.top + spacing.two }, headerStyle]}>
+    <GlassBlurProvider>
+    <View className="flex-1 bg-[#080808]">
+    <View className="w-full max-w-[430px] flex-1 self-center overflow-hidden">
+      <EntryAmbientBackground />
+      <View className="z-10 px-[22px]" style={{ paddingTop: insets.top + spacing.two }}><Animated.View style={headerStyle}>
         <OnboardingHeader onSkip={finishOnboarding} />
-      </Animated.View>
+      </Animated.View></View>
       <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.pager, contentEntranceStyle]}>
+        <Animated.View style={[{ flex: 1 }, contentEntranceStyle]}>
           {VIRTUAL_SLIDES.map((slideIndex, index) => (
             <SlideLayer
               index={index}
+              active={index === pageIndex}
               key={`${index}-${onboardingSlides[slideIndex].id}`}
               offset={offset}
               reduceMotion={reduceMotion}
@@ -220,9 +220,8 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           ))}
         </Animated.View>
       </GestureDetector>
-      <Animated.View
+      <View className="z-10 px-[22px]"><Animated.View
         style={[
-          styles.controls,
           { paddingBottom: Math.max(insets.bottom + spacing.three, spacing.four) },
           controlsStyle,
         ]}>
@@ -231,32 +230,9 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           onNext={handleNext}
           onSelectPage={goToSlide}
         />
-      </Animated.View>
+      </Animated.View></View>
     </View>
+    </View>
+    </GlassBlurProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    overflow: 'hidden',
-    backgroundColor: colors.background,
-  },
-  header: {
-    zIndex: 2,
-    paddingHorizontal: spacing.five,
-  },
-  pager: {
-    flex: 1,
-  },
-  slideLayer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-  },
-  controls: {
-    zIndex: 2,
-    paddingHorizontal: spacing.five,
-  },
-});

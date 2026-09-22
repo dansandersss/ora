@@ -23,11 +23,16 @@
           "backgroundColor": "#1E1E21"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ORA folosește fotografiile pentru actualizarea avatarului tău."
+        }
+      ]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     }
   }
 }

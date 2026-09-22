@@ -11,3 +11,8 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+/* Match the entry canvas before fonts and the router mount on web. */
+html, body, #root {
+  background-color: #080808;
+}

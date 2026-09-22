@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect } from 'react';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -16,8 +16,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EntryAmbientBackground } from '@/components/backgrounds/PremiumAnimatedBackground';
 import OraLogo from '@/../assets/images/ora-logo.svg';
-import { colors, duration, spacing, typography, zIndex } from '@/theme/tokens';
+import { colors, duration, spacing } from '@/theme/tokens';
 
 const LOGO_ASPECT_RATIO = 248 / 137;
 const LOGO_WIDTH_RATIO = 0.62;
@@ -29,23 +30,26 @@ const TAGLINE_DURATION = 450;
 const LINE_DELAY = 950;
 const LINE_DURATION = 400;
 const TAGLINE_OPACITY = 0.7;
-const LINE_WIDTH_RATIO = 0.35;
-const LINE_MIN_WIDTH = 112;
-const LINE_MAX_WIDTH = 140;
+const LINE_WIDTH_RATIO = 0.25;
+const LINE_MIN_WIDTH = 90;
+const LINE_MAX_WIDTH = 102;
 const SWIPE_DISTANCE_RATIO = 0.16;
 const SWIPE_DISTANCE_MAX = 140;
 const SWIPE_VELOCITY_THRESHOLD = -800;
 const SWIPE_ACTIVATION_DISTANCE = 12;
 const DISMISS_DURATION = 380;
 const RESET_DURATION = 280;
+const AUTHENTICATED_AUTO_DISMISS_DELAY = 1500;
 const ENTRANCE_EASING = Easing.bezier(0.22, 1, 0.36, 1);
 
 type OraSplashScreenProps = {
+  autoDismiss?: boolean;
+  allowDismiss?: boolean;
   onComplete: () => void;
   onReady: () => void;
 };
 
-export function OraSplashScreen({ onComplete, onReady }: OraSplashScreenProps) {
+export function OraSplashScreen({ autoDismiss = false, allowDismiss = true, onComplete, onReady }: OraSplashScreenProps) {
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
@@ -58,7 +62,7 @@ export function OraSplashScreen({ onComplete, onReady }: OraSplashScreenProps) {
   const screenTranslateY = useSharedValue(0);
   const entranceComplete = useSharedValue(false);
   const isDismissing = useSharedValue(false);
-  const logoWidth = Math.min(width * LOGO_WIDTH_RATIO, LOGO_MAX_WIDTH);
+  const logoWidth = Math.min(Math.min(width, 430) * LOGO_WIDTH_RATIO, LOGO_MAX_WIDTH);
   const logoHeight = logoWidth / LOGO_ASPECT_RATIO;
   const lineWidth = Math.min(Math.max(width * LINE_WIDTH_RATIO, LINE_MIN_WIDTH), LINE_MAX_WIDTH);
   const swipeDistanceThreshold = Math.min(height * SWIPE_DISTANCE_RATIO, SWIPE_DISTANCE_MAX);
@@ -99,12 +103,12 @@ export function OraSplashScreen({ onComplete, onReady }: OraSplashScreenProps) {
     );
   }, [entranceComplete, lineScaleX, logoOpacity, logoScale, logoTranslateY, reduceMotion, taglineOpacity, taglineTranslateY]);
 
-  const dismissSplash = () => {
+  const dismissSplash = useCallback(() => {
     'worklet';
-    if (isDismissing.value) return;
+    if (!allowDismiss || isDismissing.value) return;
 
-    isDismissing.value = true;
-    screenTranslateY.value = withTiming(
+    isDismissing.set(true);
+    screenTranslateY.set(withTiming(
       -height * 1.05,
       {
         duration: reduceMotion ? duration.normal : DISMISS_DURATION,
@@ -114,14 +118,21 @@ export function OraSplashScreen({ onComplete, onReady }: OraSplashScreenProps) {
       (finished) => {
         if (finished) runOnJS(onComplete)();
       },
-    );
-  };
+    ));
+  }, [allowDismiss, height, isDismissing, onComplete, reduceMotion, screenTranslateY]);
+
+  useEffect(() => {
+    if (!autoDismiss) return;
+    const timeout = setTimeout(() => dismissSplash(), AUTHENTICATED_AUTO_DISMISS_DELAY);
+    return () => clearTimeout(timeout);
+  }, [autoDismiss, dismissSplash]);
 
   const swipeGesture = Gesture.Pan()
+    .enabled(allowDismiss && !autoDismiss)
     .activeOffsetY([-SWIPE_ACTIVATION_DISTANCE, SWIPE_ACTIVATION_DISTANCE])
     .onUpdate((event) => {
       if (!entranceComplete.value || isDismissing.value) return;
-      screenTranslateY.value = Math.min(0, event.translationY);
+      screenTranslateY.set(Math.min(0, event.translationY));
     })
     .onEnd((event) => {
       if (!entranceComplete.value || isDismissing.value) return;
@@ -133,11 +144,11 @@ export function OraSplashScreen({ onComplete, onReady }: OraSplashScreenProps) {
         return;
       }
 
-      screenTranslateY.value = withTiming(0, {
+      screenTranslateY.set(withTiming(0, {
         duration: reduceMotion ? duration.fast : RESET_DURATION,
         easing: Easing.out(Easing.cubic),
         reduceMotion: ReduceMotion.System,
-      });
+      }));
     });
 
   const screenStyle = useAnimatedStyle(() => ({
@@ -151,7 +162,7 @@ export function OraSplashScreen({ onComplete, onReady }: OraSplashScreenProps) {
   }));
   const logoStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
-    transform: [{ translateY: logoTranslateY.value }, { scale: logoScale.value }],
+    transform: [{ translateY: logoTranslateY.value - height * 0.055 }, { scale: logoScale.value }],
   }));
   const taglineStyle = useAnimatedStyle(() => ({
     opacity: taglineOpacity.value,
@@ -161,66 +172,32 @@ export function OraSplashScreen({ onComplete, onReady }: OraSplashScreenProps) {
 
   return (
     <GestureDetector gesture={swipeGesture}>
-      <Animated.View onLayout={onReady} style={[styles.container, screenStyle]}>
-        <View pointerEvents="none" style={styles.composition}>
-          <Animated.View style={[styles.logo, logoStyle]}>
+      <Animated.View onLayout={onReady} style={[{ position: 'absolute', inset: 0, zIndex: 1000, backgroundColor: '#080808' }, screenStyle]}>
+        <View className="w-full max-w-[430px] flex-1 self-center">
+        <EntryAmbientBackground />
+        <Pressable accessibilityRole="button" accessibilityLabel="Continuă în ORA" accessibilityHint="Atinge sau glisează în sus" onPress={() => dismissSplash()} className="absolute inset-0" />
+        <View className="flex-1 items-center justify-center" style={{ pointerEvents: 'none' }}>
+          <Animated.View style={logoStyle}>
             <OraLogo accessibilityLabel="ORA Project" width={logoWidth} height={logoHeight} />
           </Animated.View>
-          <Animated.View
+          <View className="absolute inset-x-[24px] bottom-0 items-center"><Animated.View
             style={[
-              styles.taglineContainer,
-              { paddingBottom: Math.max(insets.bottom + spacing.five, spacing.six) },
+              { paddingBottom: Math.max(insets.bottom + spacing.four, 34) },
               taglineStyle,
             ]}>
-            <Text style={styles.tagline}>Games. Movies. Good company.</Text>
-            <Animated.View style={[styles.lineReveal, { width: lineWidth }, lineStyle]}>
+            <Text className="text-center font-inter-medium text-xs tracking-[1.25px] text-ora-primary">Games. Movies. Good company.</Text>
+            <Animated.View style={[{ width: lineWidth, height: 4, marginTop: 16, alignSelf: 'center' }, lineStyle]}>
               <LinearGradient
                 colors={[colors.brandGradientStart, colors.brandGradientEnd]}
                 end={{ x: 1, y: 0 }}
                 start={{ x: 0, y: 0 }}
-                style={styles.line}
+                style={{ flex: 1, borderRadius: 2 }}
               />
             </Animated.View>
-          </Animated.View>
+          </Animated.View></View>
+        </View>
         </View>
       </Animated.View>
     </GestureDetector>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: zIndex.overlay,
-    backgroundColor: colors.background,
-  },
-  composition: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  logo: { transform: [{ translateY: -spacing.three }] },
-  taglineContainer: {
-    position: 'absolute',
-    right: spacing.four,
-    bottom: 0,
-    left: spacing.four,
-    alignItems: 'center',
-  },
-  tagline: {
-    color: colors.textPrimary,
-    fontFamily: 'Inter_500Medium',
-    fontSize: typography.size.bodySmall,
-    lineHeight: typography.lineHeight.bodySmall,
-    letterSpacing: 1.25,
-    textAlign: 'center',
-  },
-  lineReveal: {
-    height: spacing.one,
-    marginTop: spacing.three,
-  },
-  line: {
-    flex: 1,
-    borderRadius: spacing.half,
-  },
-});

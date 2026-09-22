@@ -6,6 +6,9 @@ export const colors = {
   textPrimary: '#F5F3EF',
   textSecondary: '#A9A7A4',
   iconBackground: '#151516',
+  surface: '#29292D',
+  divider: '#39393D',
+  error: '#E08C7D',
   brandGradientStart: '#D9A441',
   brandGradientEnd: '#FFA600',
 } as const;

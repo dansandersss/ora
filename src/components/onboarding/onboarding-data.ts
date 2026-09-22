@@ -27,14 +27,14 @@ export const onboardingSlides: readonly OnboardingSlideData[] = [
   {
     id: 'points',
     title: 'Câștigă puncte',
-    description: 'Joacă, acumulează puncte\nși deblochează recompense\nexclusive',
+    description: 'Joacă, acumulează puncte și deblochează recompense exclusive',
     variant: 'icon',
     Icon: StarIcon,
   },
   {
     id: 'rewards',
     title: 'Recompense',
-    description: 'Transformă punctele\nîn timp extra, reduceri\nși beneficii speciale.',
+    description: 'Transformă punctele în timp extra, reduceri și beneficii speciale.',
     variant: 'icon',
     Icon: GiftIcon,
   },

@@ -1,4 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Href } from 'expo-router';
 
-// Set this when the authentication route is added to the router.
-export const POST_ONBOARDING_ROUTE: Href | null = null;
+const ONBOARDING_KEY = 'ora.onboardingCompleted';
+export const POST_ONBOARDING_ROUTE: Href = '/login';
+export async function hasCompletedOnboarding() {
+  return (await AsyncStorage.getItem(ONBOARDING_KEY)) === 'true';
+}
+export function completeOnboarding() {
+  return AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+}
