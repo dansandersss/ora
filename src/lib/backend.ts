@@ -3,7 +3,8 @@ import { sessionStorage } from '@/features/auth/session/session-storage';
 import type { AuthErrorCode, AuthSession, AuthUser } from '@/features/auth/types';
 import type { DeviceAvailability } from '@/features/home/types';
 import type { OraNotification } from '@/features/notifications/types';
-import type { PartyMember, PartyPreview, SessionParty } from '@/features/party/types';
+import type { PartyMember, SessionParty } from '@/features/party/types';
+import { isValidPartyCode, normalizePartyCode } from '@/features/party/utils';
 import type { PointsBalance, PointsTransaction } from '@/features/points/types';
 import type { AvatarUpload, ChangePinInput, OraProfile, ProfileStatistics, ProfileUpdateInput } from '@/features/profile/types';
 import type { GamingSession, GamingSessionHistoryItem, SessionExtensionRequest, SessionHistoryFilter } from '@/features/sessions/types';
@@ -16,7 +17,7 @@ const NOTIFICATIONS_API_URL = process.env.EXPO_PUBLIC_ORA_NOTIFICATIONS_URL ??
   'https://hueiutmfxyusmlhqkynd.supabase.co/functions/v1/ora-notifications';
 const PROFILE_API_URL = process.env.EXPO_PUBLIC_ORA_PROFILE_URL ??
   'https://hueiutmfxyusmlhqkynd.supabase.co/functions/v1/ora-profile';
-export const isPartyJoinApiEnabled = process.env.EXPO_PUBLIC_ORA_PARTY_JOIN_API_ENABLED === 'true';
+export const isPartyJoinApiEnabled = process.env.EXPO_PUBLIC_ORA_PARTY_JOIN_API_ENABLED !== 'false';
 
 type ErrorPayload = { error?: string; code?: string; message?: string };
 
@@ -302,24 +303,24 @@ export async function getPartyForGamingSession(gamingSessionId: string): Promise
   return payload.party;
 }
 
-export async function getPartyPreview(joinCode: string): Promise<PartyPreview> {
-  requirePartyJoinApi();
-  const token = await getRequiredSessionToken();
-  return request<PartyPreview>(`${ORA_API_URL}?action=party-preview&code=${encodeURIComponent(joinCode)}`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-}
-
 export async function joinPartyByCode(joinCode: string): Promise<SessionParty> {
   requirePartyJoinApi();
+  const normalizedCode = normalizePartyCode(joinCode);
+  if (!isValidPartyCode(normalizedCode)) throw new BackendError('INVALID_PARTY_CODE', 400);
   const token = await getRequiredSessionToken();
-  const payload = await request<{ party: SessionParty }>(`${ORA_API_URL}?action=join-party`, {
-    method: 'POST',
-    body: JSON.stringify({ code: joinCode }),
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  });
-  return payload.party;
+  try {
+    const payload = await request<{ party: SessionParty }>(`${ORA_API_URL}?action=join-party`, {
+      method: 'POST',
+      body: JSON.stringify({ joinCode: normalizedCode }),
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    return payload.party;
+  } catch (error) {
+    if (__DEV__ && error instanceof BackendError) {
+      console.debug('[party-join] request failed', { code: error.message, status: error.status });
+    }
+    throw error;
+  }
 }
 
 export async function leaveSessionParty(partyId: string): Promise<void> {

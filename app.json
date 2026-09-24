@@ -29,6 +29,14 @@
         {
           "photosPermission": "ORA folosește fotografiile pentru actualizarea avatarului tău."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permite aplicației ORA să folosească camera pentru scanarea codurilor QR de sesiune.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
       ]
     ],
     "experiments": {

@@ -31,7 +31,8 @@ export function groupPointsTransactions(transactions: PointsTransaction[]) {
 }
 
 export function formatPointsDate(value: string) {
-  return new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(value));
+  const label = new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(value));
+  return label.replace(/(^|\s)(\p{L})/gu, (match) => match.toUpperCase());
 }
 
 export function formatPointsTime(value: string) {

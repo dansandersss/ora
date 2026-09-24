@@ -47,7 +47,7 @@ export function NotificationsScreen() {
                 rightAccessibilityLabel="Marchează toate notificările ca citite"
                 rightContent={hasUnread ? <CheckCheck color={colors.gold} size={23} /> : null}
                 title="Notificări"
-                titleParts={[{ text: 'Notific' }, { text: 'ări', color: colors.gold }]}
+                titleParts={[{ text: 'Notific' }, { text: 'ări', gradient: true }]}
                 subtitle={today}
               />
             </Entrance>

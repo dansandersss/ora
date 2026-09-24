@@ -6,6 +6,7 @@ import { PremiumAnimatedBackground } from '@/components/backgrounds/PremiumAnima
 import { AppContent, AppScreen } from '@/components/layout/AppScreen';
 import { Entrance } from '@/components/ui/Entrance';
 import { GlassBlurProvider, GlassSurface } from '@/components/ui/GlassSurface';
+import { GoldGradientText } from '@/components/ui/GoldGradientText';
 import { CurrentSessionCard } from '@/features/home/components/CurrentSessionCard';
 import { TabContentTransition } from '@/features/home/components/TabContentTransition';
 import { ReceptionTimeModal } from '@/features/home/components/ReceptionTimeModal';
@@ -30,9 +31,10 @@ function SessionsOverviewHeader() {
   return (
     <View className="flex-row items-center justify-between">
       <View>
-        <Text className="font-inter-semibold text-xl text-ora-primary">
-          Sesi<Text className="text-ora-gold">uni</Text>
-        </Text>
+        <View accessible accessibilityLabel="Sesiuni" className="flex-row items-center">
+          <Text accessible={false} className="font-inter-semibold text-xl text-ora-primary">Sesi</Text>
+          <GoldGradientText accessible={false} className="font-inter-semibold text-xl">uni</GoldGradientText>
+        </View>
         <Text className="mt-1 font-inter text-xs text-ora-secondary">{today}</Text>
       </View>
       <NotificationBell

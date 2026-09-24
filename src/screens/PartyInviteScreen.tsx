@@ -1,53 +1,144 @@
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { Copy } from 'lucide-react-native';
-import { useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
+import { PremiumAnimatedBackground } from '@/components/backgrounds/PremiumAnimatedBackground';
 import { AppContent, AppScreen } from '@/components/layout/AppScreen';
 import { Entrance } from '@/components/ui/Entrance';
+import { GlassBlurProvider, GlassSurface } from '@/components/ui/GlassSurface';
+import { GoldGradientText } from '@/components/ui/GoldGradientText';
 import { PremiumPressable } from '@/components/ui/PremiumPressable';
-import { AmbientGoldGlow } from '@/features/home/components/AmbientGoldGlow';
 import { usePartyForSession } from '@/features/party/hooks/use-party';
 import { partyDeepLink } from '@/features/party/utils';
 import { SessionHeader } from '@/features/sessions/components/SessionHeader';
 import { colors } from '@/theme/tokens';
 
+function formatSessionDate(value?: string) {
+  const date = value ? new Date(value) : new Date();
+  const formatted = new Intl.DateTimeFormat('ro-RO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(date);
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
 export function PartyInviteScreen({ sessionId }: { sessionId: string }) {
   const partyQuery = usePartyForSession(sessionId);
   const [copied, setCopied] = useState(false);
   const party = partyQuery.data;
+  const sessionDate = useMemo(() => {
+    const hostSession = party?.members.find((member) => member.role === 'host')?.gamingSession;
+    return formatSessionDate(hostSession?.startsAt);
+  }, [party]);
+
+  const copyCode = async () => {
+    if (!party) return;
+    await Clipboard.setStringAsync(party.joinCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1_400);
+  };
 
   return (
-    <AppScreen>
-      <AmbientGoldGlow />
-      <AppContent className="flex-1 pb-8 pt-4">
-        <Entrance><SessionHeader backLabel="Inapoi la sesiune" onBack={() => router.replace(`/sessions/${sessionId}`)} title="Invita prieteni" titleSize="compact" /></Entrance>
-        {partyQuery.isLoading ? <View className="flex-1 items-center justify-center"><ActivityIndicator color={colors.gold} /></View> : party ? (
-          <View className="flex-1 items-center pt-8">
-            <Entrance delay={60}><Text className="text-center font-inter text-base leading-5 text-ora-secondary">Scaneaza sau introdu codul{`\n`}pentru a te alatura sesiunii</Text></Entrance>
-            <Entrance delay={120} depth>
-              <View className="mt-8 rounded-2xl border-2 border-ora-gold bg-white p-5">
-                <QRCode backgroundColor="#FFFFFF" color="#151516" size={190} value={partyDeepLink(party.joinCode)} />
-              </View>
+    <GlassBlurProvider>
+      <AppScreen backgroundClassName="bg-transparent">
+        <PremiumAnimatedBackground />
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}>
+          <AppContent className="flex-1 pb-[112px] pt-4">
+            <Entrance>
+              <SessionHeader
+                backLabel="Înapoi la sesiune"
+                onBack={() => router.replace('/sessions')}
+                title="Invită Prieteni"
+                titleParts={[{ text: 'Invită ' }, { text: 'Prieteni', gradient: true }]}
+                titleSize="compact"
+                subtitle={sessionDate}
+              />
             </Entrance>
-            <Entrance delay={180}>
-              <View className="mt-7 w-full">
-                <Text className="mb-2 font-inter text-xs text-ora-secondary">Cod sesiune</Text>
-                <PremiumPressable accessibilityLabel="Copiaza codul sesiunii" onPress={async () => { await Clipboard.setStringAsync(party.joinCode); setCopied(true); setTimeout(() => setCopied(false), 1400); }}>
-                  <View className="h-12 flex-row items-center justify-between rounded-xl border border-ora-gold px-4">
-                    <Text className="font-inter text-base text-ora-primary">{party.joinCode}</Text>
-                    <Copy color={copied ? '#45C99A' : colors.textPrimary} size={22} />
+
+            {partyQuery.isLoading ? (
+              <View className="flex-1 items-center justify-center">
+                <ActivityIndicator color={colors.brandGradientEnd} />
+              </View>
+            ) : party ? (
+              <View className="flex-1 items-center">
+                <Entrance delay={60}>
+                  <View className="mt-[70px] items-center">
+                    <Text className="text-center font-inter-medium text-[19px] leading-[20px] text-ora-secondary">
+                      Scanează sau introdu codul
+                    </Text>
+                    <View className="flex-row items-center justify-center">
+                      <Text className="font-inter-medium text-[19px] leading-[20px] text-ora-secondary">pentru a te </Text>
+                      <GoldGradientText className="font-inter-medium text-[19px] leading-[20px]">alătura sesiunii</GoldGradientText>
+                    </View>
                   </View>
-                </PremiumPressable>
-                <Text accessibilityLiveRegion="polite" className={`mt-2 text-center font-inter text-xs ${copied ? 'text-[#45C99A]' : 'text-transparent'}`}>Cod copiat</Text>
+                </Entrance>
+
+                <Entrance delay={120} depth>
+                  <GlassSurface
+                    className="mt-[42px]"
+                    radius={18}
+                    intensity={20}
+                    fillColor="rgba(255,255,255,0.055)"
+                    borderColor="rgba(226,158,62,0.34)"
+                    shadowStyle={{ boxShadow: '0 14px 34px rgba(0,0,0,0.24)' }}>
+                    <View className="h-[250px] w-[250px] items-center justify-center">
+                      <QRCode
+                        backgroundColor="transparent"
+                        color={colors.textPrimary}
+                        size={190}
+                        value={partyDeepLink(party.joinCode)}
+                      />
+                    </View>
+                  </GlassSurface>
+                </Entrance>
+
+                <Entrance delay={180}>
+                  <View className="mt-[38px] w-full">
+                    <Text className="mb-2.5 font-inter text-sm text-ora-secondary">Cod sesiune</Text>
+                    <PremiumPressable accessibilityLabel="Copiază codul sesiunii" onPress={copyCode}>
+                      <GlassSurface
+                        radius={18}
+                        intensity={18}
+                        fillColor="rgba(255,255,255,0.045)"
+                        borderColor="rgba(226,158,62,0.42)">
+                        <View className="h-[62px] w-full flex-row items-center justify-between px-5">
+                          <Text className="font-inter-semibold text-lg tracking-[0.4px] text-ora-primary">{party.joinCode}</Text>
+                          <Copy color={copied ? '#45C99A' : colors.textPrimary} size={27} strokeWidth={2.1} />
+                        </View>
+                      </GlassSurface>
+                    </PremiumPressable>
+                    <Text
+                      accessibilityLiveRegion="polite"
+                      className="absolute right-0 top-[76px] font-inter text-[10px]"
+                      style={{ color: copied ? '#45C99A' : 'transparent' }}>
+                      Cod copiat
+                    </Text>
+                  </View>
+                </Entrance>
+
+                <Entrance delay={240}>
+                  <Text
+                    className="mt-[38px] text-center font-inter text-sm leading-5 text-ora-secondary"
+                    style={{ letterSpacing: 4, opacity: 0.58 }}>
+                    Fiecare participant primește{`\n`}puncte individual pentru timp
+                  </Text>
+                </Entrance>
               </View>
-            </Entrance>
-            <Entrance delay={240}><Text className="mt-4 text-center font-inter text-sm leading-5 text-ora-secondary">Fiecare participant primeste{`\n`}puncte individual pentru timp</Text></Entrance>
-          </View>
-        ) : <View className="flex-1 items-center justify-center"><Text className="text-center font-inter text-ora-error">Invitatia nu a putut fi incarcata.</Text></View>}
-      </AppContent>
-    </AppScreen>
+            ) : (
+              <View className="flex-1 items-center justify-center">
+                <Text className="text-center font-inter text-ora-error">Invitația nu a putut fi încărcată.</Text>
+              </View>
+            )}
+          </AppContent>
+        </ScrollView>
+      </AppScreen>
+    </GlassBlurProvider>
   );
 }

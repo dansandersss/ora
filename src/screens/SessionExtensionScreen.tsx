@@ -1,12 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
+import { PremiumAnimatedBackground } from '@/components/backgrounds/PremiumAnimatedBackground';
 import { AppContent, AppScreen } from '@/components/layout/AppScreen';
 import { Entrance } from '@/components/ui/Entrance';
+import { GlassBlurProvider, GlassSurface } from '@/components/ui/GlassSurface';
 import { PremiumPressable } from '@/components/ui/PremiumPressable';
-import { AmbientGoldGlow } from '@/features/home/components/AmbientGoldGlow';
 import { ExtensionOption } from '@/features/sessions/components/ExtensionOption';
 import { SessionHeader } from '@/features/sessions/components/SessionHeader';
 import { gamingSessionQueryKeys, useCurrentGamingSession } from '@/features/sessions/hooks/use-current-gaming-session';
@@ -14,10 +16,11 @@ import { useSessionCountdown } from '@/features/sessions/hooks/use-session-count
 import { useRequestSessionExtension, useSessionExtensionRequest } from '@/features/sessions/hooks/use-session-extension';
 import { BackendError } from '@/lib/backend';
 import { notificationQueryKeys } from '@/features/notifications/hooks/use-notifications';
+import { colors } from '@/theme/tokens';
 
 const EXTENSION_OPTIONS = [
   { durationLabel: '+30 Minute', minutes: 30, priceMdl: 20 },
-  { durationLabel: '+1 Ora', minutes: 60, priceMdl: 45 },
+  { durationLabel: '+1 Oră', minutes: 60, priceMdl: 45 },
   { durationLabel: '+2 Ore', minutes: 120, priceMdl: 85 },
   { durationLabel: '+3 Ore', minutes: 180, priceMdl: 150 },
 ] as const;
@@ -37,12 +40,22 @@ function requestLookupErrorMessage(error: unknown) {
   return 'Solicitările existente nu au putut fi verificate. Încearcă din nou.';
 }
 
+function formatSessionDate(value?: string) {
+  const date = value ? new Date(value) : new Date();
+  const formatted = new Intl.DateTimeFormat('ro-RO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(date);
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
 export function SessionExtensionScreen({ sessionId }: { sessionId: string }) {
   const queryClient = useQueryClient();
   const sessionQuery = useCurrentGamingSession();
   const requestQuery = useSessionExtensionRequest(sessionId);
   const requestMutation = useRequestSessionExtension(sessionId);
-  const [selectedMinutes, setSelectedMinutes] = useState<number | null>(null);
+  const [selectedMinutes, setSelectedMinutes] = useState<number | null>(60);
   const session = sessionQuery.data?.id === sessionId && sessionQuery.data.status === 'active' ? sessionQuery.data : null;
   const countdown = useSessionCountdown(session);
   const latestRequest = requestQuery.data;
@@ -74,66 +87,130 @@ export function SessionExtensionScreen({ sessionId }: { sessionId: string }) {
           : null;
 
   return (
-    <AppScreen>
-      <AmbientGoldGlow />
-      <ScrollView contentContainerClassName="pb-8 pt-4" showsVerticalScrollIndicator={false}>
-        <AppContent>
-          <Entrance><SessionHeader backLabel="Înapoi la sesiune" onBack={() => router.replace('/sessions')} title="Prelungește sesiunea" titleSize="compact" /></Entrance>
-          {sessionQuery.isLoading || requestQuery.isLoading ? (
-            <View className="h-64 items-center justify-center"><ActivityIndicator color="#C9A24B" /></View>
-          ) : !session ? (
-            <Text className="mt-20 text-center font-inter-medium text-lg text-ora-secondary">Sesiunea nu mai poate fi prelungită.</Text>
-          ) : (
-            <>
-              <Entrance delay={60} depth>
-                <View className="mt-14 h-[218px] justify-center rounded-[28px] bg-ora-surface px-7 py-6">
-                  <Text className="font-inter text-lg text-ora-secondary">Timp curent</Text>
-                  <Text className="mt-3 font-inter-semibold text-[44px] leading-[52px] text-ora-primary">{countdown.remainingFormatted}</Text>
-                  <Text className="mt-4 font-inter text-lg text-ora-secondary">{session.deviceName}</Text>
-                </View>
-              </Entrance>
-              <Entrance delay={120}>
-                <Text className="mb-4 mt-10 font-inter-medium text-xl text-ora-primary">Alege durata</Text>
-                <View className="w-full gap-3">
-                  {EXTENSION_OPTIONS.map((option) => (
-                    <ExtensionOption
-                      durationLabel={option.durationLabel}
-                      key={option.minutes}
-                      onPress={() => { if (!pending) setSelectedMinutes(option.minutes); }}
-                      priceMdl={pending && option.minutes === latestRequest.requestedMinutes ? latestRequest.quotedPriceMdl : option.priceMdl}
-                      selected={selectedOption?.minutes === option.minutes}
-                    />
-                  ))}
-                </View>
-              </Entrance>
-              <Entrance delay={180}>
-                {statusMessage ? (
-                  <View className="mt-5 rounded-xl border border-ora-gold/30 bg-ora-gold/10 p-4">
-                    <Text className="text-center font-inter-medium text-sm text-ora-gold">{statusMessage}</Text>
-                    {latestRequest?.status === 'rejected' && latestRequest.rejectionReason ? <Text className="mt-2 text-center font-inter text-xs text-ora-secondary">{latestRequest.rejectionReason}</Text> : null}
-                    {pending ? <Text className="mt-2 text-center font-inter text-xs text-ora-secondary">Personalul de la recepție o va procesa în curând.</Text> : null}
+    <GlassBlurProvider>
+      <AppScreen backgroundClassName="bg-transparent">
+        <PremiumAnimatedBackground />
+        <ScrollView contentContainerClassName="pb-[112px] pt-4" showsVerticalScrollIndicator={false}>
+          <AppContent>
+            <Entrance>
+              <SessionHeader
+                backLabel="Înapoi la sesiune"
+                onBack={() => router.replace('/sessions')}
+                title="Prelungește sesiunea"
+                titleParts={[{ text: 'Prelungește ' }, { text: 'sesiunea', gradient: true }]}
+                titleSize="compact"
+                subtitle={formatSessionDate(session?.startsAt)}
+              />
+            </Entrance>
+
+            {sessionQuery.isLoading || requestQuery.isLoading ? (
+              <View className="h-[520px] items-center justify-center">
+                <ActivityIndicator color={colors.brandGradientEnd} />
+              </View>
+            ) : !session ? (
+              <Text className="mt-20 text-center font-inter-medium text-lg text-ora-secondary">Sesiunea nu mai poate fi prelungită.</Text>
+            ) : (
+              <>
+                <Entrance delay={60} depth>
+                  <GlassSurface
+                    className="mt-[40px]"
+                    radius={22}
+                    intensity={20}
+                    fillColor="rgba(255,255,255,0.052)"
+                    borderColor="rgba(226,158,62,0.34)"
+                    shadowStyle={{ boxShadow: '0 12px 30px rgba(0,0,0,0.20)' }}>
+                    <View className="h-[98px] flex-row items-center justify-between px-5">
+                      <View>
+                        <Text className="font-inter text-sm text-ora-secondary">Stație activă</Text>
+                        <Text className="mt-1 font-inter-semibold text-[23px] leading-[28px] text-ora-primary">{session.deviceName}</Text>
+                      </View>
+                      <View className="max-w-[205px] items-end">
+                        <Text className="font-inter text-sm text-ora-secondary">Timp rămas</Text>
+                        <Text
+                          adjustsFontSizeToFit
+                          className="mt-1 font-inter-semibold text-[34px] leading-[39px] text-ora-gold"
+                          minimumFontScale={0.78}
+                          numberOfLines={1}>
+                          {countdown.remainingFormatted}
+                        </Text>
+                      </View>
+                    </View>
+                  </GlassSurface>
+                </Entrance>
+
+                <Entrance delay={120}>
+                  <Text className="mb-[18px] mt-[48px] font-inter-medium text-[21px] leading-[26px] text-ora-primary">Alege durata</Text>
+                  <View className="w-full gap-3">
+                    {EXTENSION_OPTIONS.map((option) => (
+                      <ExtensionOption
+                        durationLabel={option.durationLabel}
+                        key={option.minutes}
+                        onPress={() => { if (!pending) setSelectedMinutes(option.minutes); }}
+                        priceMdl={pending && option.minutes === latestRequest.requestedMinutes ? latestRequest.quotedPriceMdl : option.priceMdl}
+                        selected={selectedOption?.minutes === option.minutes}
+                      />
+                    ))}
                   </View>
-                ) : null}
-                {requestQuery.isError ? (
-                  <View className="mt-5 items-center rounded-xl border border-ora-error/30 bg-ora-error/10 p-4">
-                    <Text className="text-center font-inter text-sm text-ora-error">{requestLookupErrorMessage(requestQuery.error)}</Text>
-                    <PremiumPressable accessibilityLabel="Reîncearcă verificarea solicitării" onPress={() => requestQuery.refetch()}>
-                      <Text className="mt-2 px-4 py-2 font-inter-semibold text-sm text-ora-gold">Reîncearcă</Text>
-                    </PremiumPressable>
-                  </View>
-                ) : null}
-                <PremiumPressable accessibilityLabel="Solicită prelungire" className="mt-5" onPress={() => { if (canSubmit && selectedMinutes) requestMutation.mutate(selectedMinutes); }}>
-                  <View className={`h-16 items-center justify-center rounded-xl ${canSubmit ? 'bg-ora-gold' : 'bg-ora-gold/40'}`}>
-                    {requestMutation.isPending ? <ActivityIndicator color="#151516" /> : <Text className="font-inter-medium text-lg text-ora-dark">{pending ? 'Cerere în așteptare' : 'Solicită prelungire'}</Text>}
-                  </View>
-                </PremiumPressable>
-                {requestMutation.isError ? <Text className="mt-3 text-center font-inter text-sm text-ora-error">{requestErrorMessage(requestMutation.error)}</Text> : null}
-                <Text className="mt-5 text-center font-inter text-xs tracking-[2px] text-ora-secondary/70">Cererea va fi aprobată de personal</Text>
-              </Entrance>
-            </>
-          )}
-        </AppContent>
-      </ScrollView>
-    </AppScreen>
+                </Entrance>
+
+                <Entrance delay={180} depth>
+                  <GlassSurface
+                    className="mt-[28px]"
+                    radius={18}
+                    intensity={20}
+                    fillColor="rgba(255,255,255,0.04)"
+                    borderColor="rgba(226,158,62,0.30)"
+                    shadowStyle={{ boxShadow: '0 12px 30px rgba(0,0,0,0.20)' }}>
+                    <View className="px-4 py-[18px]">
+                      {statusMessage ? (
+                        <View className="mb-3 rounded-[12px] bg-ora-gold/10 px-3 py-2.5">
+                          <Text className="text-center font-inter-medium text-xs text-ora-gold">{statusMessage}</Text>
+                          {latestRequest?.status === 'rejected' && latestRequest.rejectionReason ? (
+                            <Text className="mt-1 text-center font-inter text-[11px] text-ora-secondary">{latestRequest.rejectionReason}</Text>
+                          ) : null}
+                          {pending ? <Text className="mt-1 text-center font-inter text-[11px] text-ora-secondary">Personalul de la recepție o va procesa în curând.</Text> : null}
+                        </View>
+                      ) : null}
+
+                      {requestQuery.isError ? (
+                        <View className="mb-3 items-center rounded-[12px] bg-ora-error/10 px-3 py-2.5">
+                          <Text className="text-center font-inter text-xs text-ora-error">{requestLookupErrorMessage(requestQuery.error)}</Text>
+                          <PremiumPressable accessibilityLabel="Reîncearcă verificarea solicitării" onPress={() => requestQuery.refetch()}>
+                            <Text className="mt-1 px-4 py-1.5 font-inter-semibold text-xs text-ora-gold">Reîncearcă</Text>
+                          </PremiumPressable>
+                        </View>
+                      ) : null}
+
+                      <PremiumPressable
+                        accessibilityLabel="Solicită prelungire"
+                        onPress={() => { if (canSubmit && selectedMinutes) requestMutation.mutate(selectedMinutes); }}>
+                        <View className="h-[54px] overflow-hidden rounded-[16px]" style={{ boxShadow: '0 9px 24px rgba(226,158,62,0.24)' }}>
+                          <LinearGradient
+                            colors={canSubmit ? ['#FFB72C', '#F1A12B'] : ['#8C6A2E', '#725526']}
+                            end={{ x: 1, y: 1 }}
+                            start={{ x: 0, y: 0 }}
+                            style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                            {requestMutation.isPending ? (
+                              <ActivityIndicator color={colors.iconBackground} />
+                            ) : (
+                              <Text className="font-inter-semibold text-base text-ora-dark">{pending ? 'Cerere în așteptare' : 'Solicită prelungire'}</Text>
+                            )}
+                          </LinearGradient>
+                        </View>
+                      </PremiumPressable>
+
+                      {requestMutation.isError ? <Text className="mt-3 text-center font-inter text-xs text-ora-error">{requestErrorMessage(requestMutation.error)}</Text> : null}
+                      <Text className="mt-[18px] text-center font-inter text-xs text-ora-secondary" style={{ opacity: 0.78 }}>
+                        * Cererea va fi aprobată de personal la recepție.
+                      </Text>
+                    </View>
+                  </GlassSurface>
+                </Entrance>
+              </>
+            )}
+          </AppContent>
+        </ScrollView>
+      </AppScreen>
+    </GlassBlurProvider>
   );
 }

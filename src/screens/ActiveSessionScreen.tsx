@@ -9,8 +9,6 @@ import { AppContent, AppScreen } from '@/components/layout/AppScreen';
 import { Entrance } from '@/components/ui/Entrance';
 import { GlassBlurProvider, GlassSurface } from '@/components/ui/GlassSurface';
 import { PremiumPressable } from '@/components/ui/PremiumPressable';
-import { authQueryKeys } from '@/features/auth/session/auth-session';
-import type { AuthUser } from '@/features/auth/types';
 import { PartyModeChoiceModal } from '@/features/party/components/PartyModeChoiceModal';
 import { PartySection } from '@/features/party/components/PartySection';
 import { useCreateParty, usePartyForSession } from '@/features/party/hooks/use-party';
@@ -20,7 +18,6 @@ import { SessionTimerRing } from '@/features/sessions/components/SessionTimerRin
 import { useCurrentGamingSession } from '@/features/sessions/hooks/use-current-gaming-session';
 import { useSessionExpiration } from '@/features/sessions/hooks/use-session-expiration';
 import { formatDuration, useSessionCountdown } from '@/features/sessions/hooks/use-session-countdown';
-import { queryClient } from '@/lib/query-client';
 import { colors } from '@/theme/tokens';
 
 function formatLocalTime(value: string) {
@@ -53,7 +50,6 @@ function ScreenState({ children }: { children: ReactNode }) {
 
 export function ActiveSessionScreen({ sessionId }: { sessionId: string }) {
   const sessionQuery = useCurrentGamingSession();
-  const user = queryClient.getQueryData<AuthUser>(authQueryKeys.currentUser);
   const [partyChoiceVisible, setPartyChoiceVisible] = useState(false);
   const returnHome = useCallback(() => router.replace('/home'), []);
   const handleExpired = useSessionExpiration(returnHome);
@@ -114,7 +110,7 @@ export function ActiveSessionScreen({ sessionId }: { sessionId: string }) {
                   </GlassSurface>
                 )}
                 title="Sesiune activă"
-                titleParts={[{ text: 'Sesiune ' }, { text: 'activă', color: colors.gold }]}
+                titleParts={[{ text: 'Sesiune ' }, { text: 'activă', gradient: true }]}
                 titleSize="compact"
                 subtitle={formatSessionDate(session.startsAt)}
               />
@@ -159,10 +155,16 @@ export function ActiveSessionScreen({ sessionId }: { sessionId: string }) {
               </GlassSurface>
             </Entrance>
 
+            {partyQuery.data ? (
+              <Entrance delay={225} depth>
+                <PartySection party={partyQuery.data} sessionId={session.id} />
+              </Entrance>
+            ) : null}
+
             <Entrance delay={240} depth>
               <PremiumPressable
                 accessibilityLabel="Prelungește sesiunea"
-                className="mt-[28px]"
+                className={partyQuery.data ? 'mt-[26px]' : 'mt-[28px]'}
                 onPress={() => router.push(`/sessions/${session.id}/extend`)}>
                 <View
                   className="h-14 overflow-hidden rounded-[17px]"
@@ -188,9 +190,7 @@ export function ActiveSessionScreen({ sessionId }: { sessionId: string }) {
                     <Text className="px-5 py-3 font-inter-medium text-sm text-ora-gold">Reîncearcă</Text>
                   </PremiumPressable>
                 </View>
-              ) : partyQuery.data ? (
-                <PartySection currentUserId={user?.id} party={partyQuery.data} sessionId={session.id} />
-              ) : (
+              ) : !partyQuery.data ? (
                 <View className="mt-3 items-center">
                   <PremiumPressable
                     accessibilityLabel="Începe sesiunea cu prietenii"
@@ -204,7 +204,7 @@ export function ActiveSessionScreen({ sessionId }: { sessionId: string }) {
                     <Text className="mt-2 text-center font-inter text-xs text-ora-error">Party nu a putut fi creat. Încearcă din nou.</Text>
                   ) : null}
                 </View>
-              )}
+              ) : null}
             </Entrance>
           </AppContent>
         </ScrollView>
@@ -212,7 +212,12 @@ export function ActiveSessionScreen({ sessionId }: { sessionId: string }) {
         <PartyModeChoiceModal
           creating={createParty.isPending}
           onClose={() => setPartyChoiceVisible(false)}
-          onCreateHost={() => createParty.mutate(undefined, { onSuccess: () => setPartyChoiceVisible(false) })}
+          onCreateHost={() => createParty.mutate(undefined, {
+            onSuccess: () => {
+              setPartyChoiceVisible(false);
+              router.push(`/sessions/${session.id}/invite`);
+            },
+          })}
           onJoin={() => { setPartyChoiceVisible(false); router.push('/party/join'); }}
           visible={partyChoiceVisible}
         />

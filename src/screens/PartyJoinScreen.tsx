@@ -1,31 +1,31 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { Camera } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
 
+import { PremiumAnimatedBackground } from '@/components/backgrounds/PremiumAnimatedBackground';
 import { AppContent, AppScreen } from '@/components/layout/AppScreen';
 import { Entrance } from '@/components/ui/Entrance';
+import { GlassBlurProvider, GlassSurface } from '@/components/ui/GlassSurface';
 import { PremiumPressable } from '@/components/ui/PremiumPressable';
 import { authQueryKeys, restoreSession } from '@/features/auth/session/auth-session';
 import type { AuthUser } from '@/features/auth/types';
-import { AmbientGoldGlow } from '@/features/home/components/AmbientGoldGlow';
-import { useJoinParty, usePartyPreview } from '@/features/party/hooks/use-party';
-import { normalizePartyCode } from '@/features/party/utils';
-import { formatDuration } from '@/features/sessions/hooks/use-session-countdown';
+import { PartyQrScanner } from '@/features/party/components/PartyQrScanner';
+import { getPartyJoinErrorMessage } from '@/features/party/errors';
+import { useJoinParty } from '@/features/party/hooks/use-party';
+import { isValidPartyCode, normalizePartyCode } from '@/features/party/utils';
+import { SessionHeader } from '@/features/sessions/components/SessionHeader';
 import { queryClient } from '@/lib/query-client';
 import { colors } from '@/theme/tokens';
-
-function sessionRemaining(endsAt: string) {
-  return formatDuration(Math.max(0, Date.parse(endsAt) - Date.now()));
-}
 
 export function PartyJoinScreen() {
   const params = useLocalSearchParams<{ code?: string }>();
   const initialCode = useMemo(() => normalizePartyCode(params.code ?? ''), [params.code]);
   const [code, setCode] = useState(initialCode);
-  const [submittedCode, setSubmittedCode] = useState(initialCode.length === 9 ? initialCode : '');
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const preview = usePartyPreview(submittedCode, !checkingAuth);
-  const joinParty = useJoinParty(submittedCode);
+  const [entryMode, setEntryMode] = useState<'scan' | 'manual'>(initialCode ? 'manual' : 'scan');
+  const joinParty = useJoinParty();
+  const joinError = joinParty.error ? getPartyJoinErrorMessage(joinParty.error) : null;
 
   useEffect(() => {
     let active = true;
@@ -41,57 +41,138 @@ export function PartyJoinScreen() {
     return () => { active = false; };
   }, [initialCode]);
 
-  const party = preview.data?.party;
-  const ownSession = preview.data?.currentUserSession;
-  const canJoin = ownSession?.status === 'active' || ownSession?.status === 'scheduled';
+  const returnToSession = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/sessions');
+  };
+
+  const joinWithCode = async (value: string) => {
+    const normalizedCode = normalizePartyCode(value);
+    if (!isValidPartyCode(normalizedCode)) throw new Error('INVALID_PARTY_CODE');
+    setCode(normalizedCode);
+
+    await joinParty.mutateAsync(normalizedCode);
+    // Enter through the stable tab route. The Sessions tab resolves the current
+    // user's active session without passing frozen nested-router params.
+    router.replace('/sessions');
+  };
 
   return (
-    <AppScreen>
-      <AmbientGoldGlow />
-      <AppContent className="flex-1 pb-8 pt-6">
-        <Entrance><Text className="text-center font-inter-semibold text-xl text-ora-primary">Alatura-te unei sesiuni</Text></Entrance>
-        {checkingAuth ? <View className="flex-1 items-center justify-center"><ActivityIndicator color={colors.gold} /></View> : !party ? (
-          <Entrance delay={80}>
-            <View className="mt-20">
-              <Text className="text-center font-inter text-base text-ora-secondary">Introdu codul Party primit de la prietenul tau.</Text>
-              <TextInput
-                autoCapitalize="characters"
-                autoCorrect={false}
-                className="mt-8 h-16 rounded-xl border-2 border-ora-divider px-5 text-center font-inter-semibold text-2xl tracking-[3px] text-ora-primary focus:border-ora-gold"
-                maxLength={9}
-                onChangeText={(value) => { setCode(normalizePartyCode(value)); setSubmittedCode(''); }}
-                placeholder="XXXX-XXXX"
-                placeholderTextColor={colors.textSecondary}
-                value={code}
+    <GlassBlurProvider>
+      <AppScreen backgroundClassName="bg-transparent">
+        <PremiumAnimatedBackground />
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="pb-10 pt-4"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <AppContent>
+            <Entrance>
+              <SessionHeader
+                backLabel="Înapoi la sesiune"
+                onBack={returnToSession}
+                title="Alătură-te unei sesiuni"
+                titleSize="compact"
               />
-              <PremiumPressable accessibilityLabel="Verifica codul Party" className="mt-5" onPress={() => code.length === 9 && setSubmittedCode(code)}>
-                <View className={`h-14 items-center justify-center rounded-xl ${code.length === 9 ? 'bg-ora-gold' : 'bg-ora-gold/35'}`}><Text className="font-inter-semibold text-lg text-ora-dark">Continua</Text></View>
-              </PremiumPressable>
-              {preview.isError ? <Text className="mt-4 text-center font-inter text-sm text-ora-error">Codul Party nu este valid sau nu mai este activ.</Text> : null}
-            </View>
-          </Entrance>
-        ) : (
-          <View className="flex-1 justify-center">
-            <Entrance delay={60}><Text className="text-center font-inter-semibold text-[28px] text-ora-primary">{party.hostName ?? 'Un prieten'} te invita la sesiune</Text></Entrance>
-            <Entrance delay={120} depth>
-              <View className="mt-8 rounded-[28px] border border-white/10 bg-ora-surface p-6">
-                <Text className="font-inter text-sm text-ora-secondary">Host</Text><Text className="mt-1 font-inter-semibold text-xl text-ora-primary">{party.hostName ?? 'Membru ORA'}</Text>
-                <Text className="mt-5 font-inter text-sm text-ora-secondary">Participanti</Text><Text className="mt-1 font-inter-semibold text-xl text-ora-primary">{party.members.length}/{party.maxMembers}</Text>
-                <View className="my-5 h-px bg-ora-divider" />
-                <Text className="font-inter-medium text-lg text-ora-gold">Sesiunea ta</Text>
-                {ownSession ? <><Text className="mt-2 font-inter-semibold text-2xl text-ora-primary">{ownSession.deviceName}</Text><Text className="mt-1 font-inter text-lg text-ora-secondary">{ownSession.status === 'active' ? sessionRemaining(ownSession.endsAt) : 'Programata'}</Text></> : <><Text className="mt-2 font-inter-semibold text-xl text-ora-primary">Nu ai o sesiune disponibila.</Text><Text className="mt-2 font-inter text-sm text-ora-secondary">Adreseaza-te receptiei ORA pentru a adauga timp.</Text></>}
+            </Entrance>
+
+            {checkingAuth ? (
+              <View className="h-[440px] items-center justify-center">
+                <ActivityIndicator color={colors.brandGradientEnd} />
               </View>
-            </Entrance>
-            <Entrance delay={180}>
-              <PremiumPressable accessibilityLabel="Alatura-te Party" className="mt-6" onPress={() => canJoin && joinParty.mutate(undefined, { onSuccess: () => ownSession && router.replace(`/sessions/${ownSession.id}`) })}>
-                <View className={`h-14 items-center justify-center rounded-xl ${canJoin ? 'bg-ora-gold' : 'bg-ora-gold/35'}`}><Text className="font-inter-semibold text-lg text-ora-dark">Alatura-te</Text></View>
-              </PremiumPressable>
-              <PremiumPressable accessibilityLabel="Renunta" className="mt-2" onPress={() => router.replace('/home')}><Text className="py-3 text-center font-inter-medium text-ora-secondary">Renunta</Text></PremiumPressable>
-              {joinParty.isError ? <Text className="text-center font-inter text-sm text-ora-error">Nu te-ai putut alatura sesiunii.</Text> : null}
-            </Entrance>
+            ) : (
+              <Entrance delay={70} depth>
+                <View className="mt-7">
+                  <Text className="mb-5 text-center font-inter text-sm leading-5 text-ora-secondary">
+                    Scanează codul QR primit de la prietenul tău sau introdu codul sesiunii.
+                  </Text>
+                  {entryMode === 'scan' ? (
+                    <PartyQrScanner
+                      busy={joinParty.isPending}
+                      errorMessage={joinError}
+                      onCodeScanned={joinWithCode}
+                      onManualEntry={() => {
+                        joinParty.reset();
+                        setEntryMode('manual');
+                      }}
+                    />
+                  ) : (
+                    <ManualCodeEntry
+                      code={code}
+                      errorMessage={joinError}
+                      loading={joinParty.isPending}
+                      onChangeCode={(value) => {
+                        joinParty.reset();
+                        setCode(normalizePartyCode(value));
+                      }}
+                      onScan={() => {
+                        joinParty.reset();
+                        setEntryMode('scan');
+                      }}
+                      onSubmit={() => joinWithCode(code).catch(() => undefined)}
+                    />
+                  )}
+                </View>
+              </Entrance>
+            )}
+          </AppContent>
+        </ScrollView>
+      </AppScreen>
+    </GlassBlurProvider>
+  );
+}
+
+type ManualCodeEntryProps = {
+  code: string;
+  errorMessage?: string | null;
+  loading: boolean;
+  onChangeCode: (value: string) => void;
+  onScan: () => void;
+  onSubmit: () => void;
+};
+
+function ManualCodeEntry({ code, errorMessage, loading, onChangeCode, onScan, onSubmit }: ManualCodeEntryProps) {
+  const ready = isValidPartyCode(code) && !loading;
+
+  return (
+    <GlassSurface
+      radius={26}
+      intensity={20}
+      fillColor="rgba(255,255,255,0.055)"
+      borderColor="rgba(226,158,62,0.34)">
+      <View className="px-6 py-7">
+        <Text className="text-center font-inter-semibold text-xl text-ora-primary">Codul sesiunii</Text>
+        <Text className="mt-2 text-center font-inter text-sm text-ora-secondary">
+          Introdu cele 8 caractere primite de la prietenul tău. Cratima se adaugă automat.
+        </Text>
+        <TextInput
+          accessibilityLabel="Codul sesiunii"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          className="mt-7 h-16 rounded-[16px] border border-ora-gold/55 bg-black/20 px-5 text-center font-inter-semibold text-2xl tracking-[3px] text-ora-primary"
+          maxLength={9}
+          onChangeText={onChangeCode}
+          onSubmitEditing={ready ? onSubmit : undefined}
+          placeholder="XXXX-XXXX"
+          placeholderTextColor={colors.textSecondary}
+          returnKeyType="done"
+          value={code}
+        />
+        <PremiumPressable accessibilityLabel="Alătură-te folosind codul sesiunii" className="mt-5" onPress={ready ? onSubmit : undefined}>
+          <View className={`min-h-[52px] items-center justify-center rounded-[14px] ${ready ? 'bg-ora-gold' : 'bg-ora-gold/35'}`}>
+            {loading ? <ActivityIndicator color={colors.iconBackground} size="small" /> : (
+              <Text className="font-inter-semibold text-base text-ora-dark">Continuă</Text>
+            )}
           </View>
-        )}
-      </AppContent>
-    </AppScreen>
+        </PremiumPressable>
+        {errorMessage ? <Text className="mt-4 text-center font-inter text-sm text-ora-error">{errorMessage}</Text> : null}
+        <PremiumPressable accessibilityLabel="Scanează codul QR" className="mt-4" onPress={onScan}>
+          <View className="h-12 flex-row items-center justify-center rounded-[14px] border border-ora-gold/65">
+            <Camera color={colors.brandGradientEnd} size={19} />
+            <Text className="ml-2 font-inter-medium text-sm text-ora-primary">Scanează codul QR</Text>
+          </View>
+        </PremiumPressable>
+      </View>
+    </GlassSurface>
   );
 }

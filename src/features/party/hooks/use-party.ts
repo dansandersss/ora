@@ -2,11 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { SessionParty } from '@/features/party/types';
 import { notificationQueryKeys } from '@/features/notifications/hooks/use-notifications';
-import { createSessionParty, getPartyForGamingSession, getPartyPreview, isPartyJoinApiEnabled, joinPartyByCode } from '@/lib/backend';
+import { createSessionParty, getPartyForGamingSession, joinPartyByCode } from '@/lib/backend';
 
 export const partyQueryKeys = {
   forSession: (sessionId: string) => ['party', 'session', sessionId] as const,
-  preview: (code: string) => ['party', 'preview', code] as const,
 };
 
 export function usePartyForSession(sessionId: string) {
@@ -34,19 +33,10 @@ export function useCreateParty(sessionId: string) {
   });
 }
 
-export function usePartyPreview(code: string, enabled = true) {
-  return useQuery({
-    enabled: isPartyJoinApiEnabled && enabled && code.length === 9,
-    queryFn: () => getPartyPreview(code),
-    queryKey: partyQueryKeys.preview(code),
-    retry: false,
-  });
-}
-
-export function useJoinParty(code: string) {
+export function useJoinParty() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => joinPartyByCode(code),
+    mutationFn: (code: string) => joinPartyByCode(code),
     onSuccess: (party) => {
       party.members.forEach((member) => {
         queryClient.setQueryData(partyQueryKeys.forSession(member.gamingSessionId), party);

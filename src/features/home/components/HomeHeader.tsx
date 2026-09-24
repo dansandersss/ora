@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 
 import CoolIcon from '@/../assets/images/cool.svg';
+import { GoldGradientText } from '@/components/ui/GoldGradientText';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { useProfile } from '@/features/profile/hooks/use-profile';
 
@@ -43,15 +44,14 @@ export function HomeHeader({ onNotificationsPress }: HomeHeaderProps) {
     <View className="flex-row items-center justify-between">
       <View>
         <View className="flex-row items-center">
-          <Text className="font-inter-semibold text-xl text-ora-primary">
-            {firstName ? (
-              <>
-                Salut, <Text className="text-ora-gold">{firstName}!</Text>
-              </>
-            ) : (
-              'Salut!'
-            )}
-          </Text>
+          {firstName ? (
+            <View accessible accessibilityLabel={`Salut, ${firstName}!`} className="flex-row items-center">
+              <Text accessible={false} className="font-inter-semibold text-xl text-ora-primary">Salut, </Text>
+              <GoldGradientText accessible={false} className="font-inter-semibold text-xl">{firstName}!</GoldGradientText>
+            </View>
+          ) : (
+            <Text className="font-inter-semibold text-xl text-ora-primary">Salut!</Text>
+          )}
           <View className="ml-2">
             <CoolIcon height={16} width={16} />
           </View>
