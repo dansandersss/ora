@@ -2,11 +2,11 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
-import { PremiumAnimatedBackground } from '@/components/backgrounds/PremiumAnimatedBackground';
 import { AppContent, AppScreen } from '@/components/layout/AppScreen';
 import { Entrance } from '@/components/ui/Entrance';
-import { GlassBlurProvider, GlassSurface } from '@/components/ui/GlassSurface';
+import { GlassSurface } from '@/components/ui/GlassSurface';
 import { GoldGradientText } from '@/components/ui/GoldGradientText';
+import { PremiumTabLoader } from '@/components/ui/PremiumTabLoader';
 import { CurrentSessionCard } from '@/features/home/components/CurrentSessionCard';
 import { TabContentTransition } from '@/features/home/components/TabContentTransition';
 import { ReceptionTimeModal } from '@/features/home/components/ReceptionTimeModal';
@@ -61,7 +61,15 @@ export default function SessionsRoute() {
     ? null
     : sessionQuery.data ?? null;
 
-  if (!sessionQuery.isLoading && currentSession?.status === 'active') {
+  if (sessionQuery.isPending) {
+    return (
+      <TabContentTransition tabName="sessions">
+        <PremiumTabLoader label="Se încarcă sesiunile..." />
+      </TabContentTransition>
+    );
+  }
+
+  if (currentSession?.status === 'active') {
     return (
       <TabContentTransition tabName="sessions">
         <ActiveSessionScreen sessionId={currentSession.id} />
@@ -84,9 +92,7 @@ export default function SessionsRoute() {
   };
   return (
     <TabContentTransition tabName="sessions">
-      <GlassBlurProvider>
         <AppScreen backgroundClassName="bg-transparent">
-          <PremiumAnimatedBackground />
           <ScrollView
             className="flex-1"
             contentContainerClassName="pb-32 pt-5"
@@ -95,13 +101,7 @@ export default function SessionsRoute() {
               <Entrance><SessionsOverviewHeader /></Entrance>
               <Entrance delay={70} depth>
                 <View className="mt-7">
-                  {sessionQuery.isLoading ? (
-                    <GlassSurface radius={22}>
-                      <View className="h-[118px] items-center justify-center">
-                        <Text className="font-inter text-sm text-ora-secondary">Se verifică sesiunea...</Text>
-                      </View>
-                    </GlassSurface>
-                  ) : sessionQuery.isError ? (
+                  {sessionQuery.isError ? (
                     <GlassSurface borderColor="rgba(224,140,125,0.40)" radius={22}>
                       <View className="min-h-[118px] items-center justify-center px-6">
                         <Text className="text-center font-inter text-sm text-ora-error">Sesiunea nu a putut fi încărcată.</Text>
@@ -119,14 +119,11 @@ export default function SessionsRoute() {
                   )}
                 </View>
               </Entrance>
-              {!sessionQuery.isLoading && currentSession?.status !== 'active' ? (
-                <Entrance delay={140}><SessionHistory /></Entrance>
-              ) : null}
+              <Entrance delay={140}><SessionHistory /></Entrance>
             </AppContent>
           </ScrollView>
           <ReceptionTimeModal onClose={() => setShowTimeModal(false)} visible={showTimeModal} />
         </AppScreen>
-      </GlassBlurProvider>
     </TabContentTransition>
   );
 }

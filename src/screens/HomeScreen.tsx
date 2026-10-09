@@ -5,7 +5,6 @@ import { Platform, ScrollView, Text, View } from 'react-native';
 
 import { Entrance } from '@/components/ui/Entrance';
 import { AppContent, AppScreen, useAppLayout } from '@/components/layout/AppScreen';
-import { GlassBlurProvider } from '@/components/ui/GlassSurface';
 import { CurrentSessionCard } from '@/features/home/components/CurrentSessionCard';
 import { DeviceCard } from '@/features/home/components/DeviceCard';
 import { HomeHeader } from '@/features/home/components/HomeHeader';
@@ -19,7 +18,6 @@ import { usePointsBalance } from '@/features/points/hooks/use-points';
 import { useActivateGamingSession } from '@/features/sessions/hooks/use-activate-gaming-session';
 import { useCurrentGamingSession } from '@/features/sessions/hooks/use-current-gaming-session';
 import { useSessionExpiration } from '@/features/sessions/hooks/use-session-expiration';
-import {PremiumAnimatedBackground} from "@/components/backgrounds/PremiumAnimatedBackground";
 
 function interactionHaptic() {
   if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => undefined);
@@ -57,11 +55,7 @@ export function HomeScreen() {
   const handleDevicePress = (_device: DeviceAvailability) => interactionHaptic();
 
   return (
-    <GlassBlurProvider>
     <AppScreen backgroundClassName="bg-transparent">
-        <View className="absolute inset-0" pointerEvents="none">
-            <PremiumAnimatedBackground />
-        </View>
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-28 pt-5"
@@ -186,6 +180,5 @@ export function HomeScreen() {
       </ScrollView>
       <ReceptionTimeModal onClose={() => setShowTimeModal(false)} visible={showTimeModal} />
     </AppScreen>
-    </GlassBlurProvider>
   );
 }

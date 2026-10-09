@@ -4,16 +4,16 @@ import type { ReactNode } from 'react';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
-import { PremiumAnimatedBackground } from '@/components/backgrounds/PremiumAnimatedBackground';
 import { AppContent, AppScreen } from '@/components/layout/AppScreen';
 import { Entrance } from '@/components/ui/Entrance';
-import { GlassBlurProvider, GlassSurface } from '@/components/ui/GlassSurface';
+import { GlassSurface } from '@/components/ui/GlassSurface';
 import { PremiumPressable } from '@/components/ui/PremiumPressable';
 import { PartyModeChoiceModal } from '@/features/party/components/PartyModeChoiceModal';
 import { PartySection } from '@/features/party/components/PartySection';
 import { useCreateParty, usePartyForSession } from '@/features/party/hooks/use-party';
 import { SessionHeader } from '@/features/sessions/components/SessionHeader';
 import { HistoryActionIcon } from '@/features/sessions/components/HistoryActionIcon';
+import { setSessionHistoryReturnRoute } from '@/features/sessions/history-navigation';
 import { SessionTimerRing } from '@/features/sessions/components/SessionTimerRing';
 import { useCurrentGamingSession } from '@/features/sessions/hooks/use-current-gaming-session';
 import { useSessionExpiration } from '@/features/sessions/hooks/use-session-expiration';
@@ -39,12 +39,9 @@ function formatSessionDate(value: string) {
 
 function ScreenState({ children }: { children: ReactNode }) {
   return (
-    <GlassBlurProvider>
       <AppScreen backgroundClassName="bg-transparent">
-        <PremiumAnimatedBackground />
         <AppContent className="flex-1 items-center justify-center">{children}</AppContent>
       </AppScreen>
-    </GlassBlurProvider>
   );
 }
 
@@ -85,9 +82,7 @@ export function ActiveSessionScreen({ sessionId }: { sessionId: string }) {
   ];
 
   return (
-    <GlassBlurProvider>
       <AppScreen backgroundClassName="bg-transparent">
-        <PremiumAnimatedBackground />
         <ScrollView
           className="flex-1"
           contentContainerClassName="pb-32 pt-3"
@@ -97,7 +92,7 @@ export function ActiveSessionScreen({ sessionId }: { sessionId: string }) {
               <SessionHeader
                 backLabel="Înapoi acasă"
                 onBack={returnHome}
-                onRightPress={() => router.navigate('/sessions/history')}
+                onRightPress={() => { setSessionHistoryReturnRoute('sessions'); router.navigate('/sessions/history'); }}
                 rightAccessibilityLabel="Deschide istoricul sesiunilor"
                 rightContent={(
                   <GlassSurface
@@ -222,6 +217,5 @@ export function ActiveSessionScreen({ sessionId }: { sessionId: string }) {
           visible={partyChoiceVisible}
         />
       </AppScreen>
-    </GlassBlurProvider>
   );
 }

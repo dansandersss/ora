@@ -1,4 +1,6 @@
 import { AuthApiError } from '@/features/auth/errors';
+import { File as ExpoFile, UploadType } from 'expo-file-system';
+import { Platform } from 'react-native';
 import { sessionStorage } from '@/features/auth/session/session-storage';
 import type { AuthErrorCode, AuthSession, AuthUser } from '@/features/auth/types';
 import type { DeviceAvailability } from '@/features/home/types';
@@ -135,9 +137,43 @@ export async function changeProfilePin(input: ChangePinInput): Promise<void> {
 }
 
 export async function uploadProfileAvatar(upload: AvatarUpload): Promise<OraProfile> {
+  if (Platform.OS !== 'web') {
+    const token = await getRequiredSessionToken();
+    const file = new ExpoFile(upload.uri);
+    let result: Awaited<ReturnType<ExpoFile['upload']>>;
+
+    try {
+      result = await file.upload(`${PROFILE_API_URL}?action=upload-avatar`, {
+        fieldName: 'avatar',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        httpMethod: 'POST',
+        mimeType: upload.mimeType,
+        sessionType: 'foreground',
+        uploadType: UploadType.MULTIPART,
+      });
+    } catch {
+      throw new BackendError('Serviciul ORA nu este disponibil momentan.');
+    }
+
+    let payload: { profile?: OraProfile } & ErrorPayload = {};
+    try {
+      payload = JSON.parse(result.body) as typeof payload;
+    } catch {
+      // A non-JSON response is handled as an API failure below.
+    }
+
+    if (result.status < 200 || result.status >= 300 || !payload.profile) {
+      throw new BackendError(payload.message ?? payload.error ?? payload.code ?? 'AVATAR_UPLOAD_FAILED', result.status);
+    }
+    return payload.profile;
+  }
+
   const formData = new FormData();
-  const nativeFile = { name: upload.name, type: upload.mimeType, uri: upload.uri } as unknown as Blob;
-  formData.append('avatar', upload.file ?? nativeFile, upload.name);
+  if (!upload.file) throw new BackendError('AVATAR_REQUIRED', 400);
+  formData.append('avatar', upload.file, upload.name);
   const payload = await profileRequest<{ profile: OraProfile }>('upload-avatar', { method: 'POST', body: formData });
   return payload.profile;
 }

@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 
 import type { OraNotification } from '@/features/notifications/types';
+import { setSessionHistoryReturnRoute } from '@/features/sessions/history-navigation';
 
 export type DisplayNotification = OraNotification & { sourceIds: string[] };
 
@@ -62,6 +63,7 @@ export function openNotificationDestination(notification: OraNotification) {
       router.replace(sessionId ? `/sessions/${sessionId}` : '/sessions');
       break;
     case 'session_completed':
+      setSessionHistoryReturnRoute('sessions');
       router.replace('/sessions/history');
       break;
     case 'session_assigned':

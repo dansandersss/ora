@@ -14,8 +14,8 @@ export function Entrance({ children, delay = 0, depth = false }: EntranceProps) 
     }));
   }, [delay, progress]);
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [{ translateY: (1 - progress.value) * (depth ? 16 : 12) }, { scale: depth ? 0.985 + progress.value * 0.015 : 1 }],
+    opacity: 0.84 + progress.value * 0.16,
+    transform: [{ translateY: (1 - progress.value) * (depth ? 10 : 7) }, { scale: depth ? 0.992 + progress.value * 0.008 : 1 }],
   }));
   return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }

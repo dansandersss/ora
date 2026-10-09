@@ -1,14 +1,14 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import GiftIcon from '@/../assets/images/gift.svg';
 import StarIcon from '@/../assets/images/star.svg';
-import { PremiumAnimatedBackground } from '@/components/backgrounds/PremiumAnimatedBackground';
 import { AppContent, AppScreen } from '@/components/layout/AppScreen';
 import { Entrance } from '@/components/ui/Entrance';
-import { GlassBlurProvider, GlassSurface } from '@/components/ui/GlassSurface';
+import { GlassSurface } from '@/components/ui/GlassSurface';
 import { GoldGradientText } from '@/components/ui/GoldGradientText';
 import { PremiumPressable } from '@/components/ui/PremiumPressable';
+import { PremiumTabLoader } from '@/components/ui/PremiumTabLoader';
 import { PointsRuleRow } from '@/features/points/components/PointsRuleRow';
 import { pointsRules } from '@/features/points/data/points-rules';
 import { usePointsBalance } from '@/features/points/hooks/use-points';
@@ -47,10 +47,10 @@ function PointsHeader() {
 
 export function PointsScreen() {
   const balanceQuery = usePointsBalance();
+  if (balanceQuery.isPending) return <PremiumTabLoader label="Se încarcă punctele..." />;
+
   return (
-    <GlassBlurProvider>
       <AppScreen backgroundClassName="bg-transparent">
-        <PremiumAnimatedBackground />
         <ScrollView contentContainerClassName="pb-[112px] pt-4" showsVerticalScrollIndicator={false}>
           <AppContent>
             <Entrance><PointsHeader /></Entrance>
@@ -68,9 +68,7 @@ export function PointsScreen() {
                       <View className="h-9 w-9 p-2 items-center justify-center rounded-[9px] border border-ora-gold/35 bg-ora-gold/15">
                         <StarIcon height={16} width={16} />
                       </View>
-                      {balanceQuery.isLoading ? (
-                        <View className="flex-1 items-start justify-center"><ActivityIndicator color="#E29E3E" size="small" /></View>
-                      ) : balanceQuery.isError || !balanceQuery.data ? (
+                      {balanceQuery.isError || !balanceQuery.data ? (
                         <Text className="mt-3 font-inter text-xs leading-4 text-ora-secondary">Punctele nu au putut fi încărcate.</Text>
                       ) : (
                         <View className="mt-3">
@@ -117,6 +115,5 @@ export function PointsScreen() {
           </AppContent>
         </ScrollView>
       </AppScreen>
-    </GlassBlurProvider>
   );
 }

@@ -9,6 +9,11 @@ const messages: Record<string, string> = {
   INVALID_NEW_PIN: 'Noul PIN trebuie să conțină exact 4 cifre.',
   PIN_UNCHANGED: 'Noul PIN trebuie să fie diferit de PIN-ul curent.',
   PIN_CHANGE_FAILED: 'PIN-ul nu a putut fi schimbat.',
+  AVATAR_REQUIRED: 'Selectează o fotografie pentru profil.',
+  AVATAR_TOO_LARGE: 'Imaginea trebuie să aibă maximum 5 MB.',
+  UNSUPPORTED_AVATAR_TYPE: 'Alege o imagine JPEG, PNG, WebP, HEIC sau HEIF.',
+  AVATAR_UPLOAD_FAILED: 'Fotografia nu a putut fi încărcată. Încearcă din nou.',
+  UNAUTHORIZED: 'Sesiunea a expirat. Autentifică-te din nou.',
 };
 
 export function getProfileErrorMessage(error: unknown, fallback = 'A apărut o eroare. Încearcă din nou.') {

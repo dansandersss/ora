@@ -34,7 +34,10 @@ type AppScreenProps = PropsWithChildren<{
 
 export function AppScreen({ backgroundClassName = 'bg-ora-background', children }: AppScreenProps) {
   return (
-    <SafeAreaView className={`flex-1 ${backgroundClassName}`} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      className={`flex-1 ${backgroundClassName}`}
+      edges={['top', 'left', 'right']}
+      style={{ backgroundColor: backgroundClassName === 'bg-transparent' ? 'transparent' : '#080808' }}>
       {children}
     </SafeAreaView>
   );

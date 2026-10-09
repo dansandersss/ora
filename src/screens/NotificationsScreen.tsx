@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { useNavigation } from 'expo-router';
 import { Bell, CheckCheck } from 'lucide-react-native';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
@@ -16,6 +16,7 @@ import { SessionHeader } from '@/features/sessions/components/SessionHeader';
 import { colors } from '@/theme/tokens';
 
 export function NotificationsScreen() {
+  const navigation = useNavigation();
   const notificationsQuery = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
@@ -25,7 +26,9 @@ export function NotificationsScreen() {
   const today = localizedDate.charAt(0).toUpperCase() + localizedDate.slice(1);
 
   const returnToPreviousScreen = () => {
-    router.replace(consumeNotificationReturnRoute());
+    const route = consumeNotificationReturnRoute();
+    const tabName = route.slice(1) as 'home' | 'sessions' | 'profile';
+    navigation.navigate(tabName as never);
   };
 
   const openNotification = (notification: DisplayNotification) => {

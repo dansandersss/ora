@@ -13,6 +13,25 @@ import { colors } from '@/theme/tokens';
 
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
 
+function normalizeAvatarMimeType(mimeType: string | null | undefined, uri: string) {
+  const normalized = mimeType?.toLowerCase() === 'image/jpg' ? 'image/jpeg' : mimeType?.toLowerCase();
+  if (normalized && allowedMimeTypes.has(normalized)) return normalized;
+
+  const extension = uri.split('?')[0].split('.').pop()?.toLowerCase();
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg';
+  if (extension === 'png') return 'image/png';
+  if (extension === 'webp') return 'image/webp';
+  if (extension === 'heic') return 'image/heic';
+  if (extension === 'heif') return 'image/heif';
+  return null;
+}
+
+function avatarFileName(fileName: string | null | undefined, mimeType: string) {
+  if (fileName?.trim()) return fileName;
+  const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1];
+  return `avatar.${extension}`;
+}
+
 export function EditProfileScreen() {
   const profileQuery = useProfile();
   const updateMutation = useUpdateProfile();
@@ -26,15 +45,44 @@ export function EditProfileScreen() {
 
   const pickAvatar = async () => {
     setError('');
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) { Alert.alert('Acces necesar', 'Permite accesul la fotografii pentru a schimba avatarul.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], mediaTypes: ['images'], quality: 0.82 });
-    if (result.canceled) return;
-    const asset = result.assets[0];
-    if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) { setError('Imaginea trebuie să aibă maximum 5 MB.'); return; }
-    const mimeType = asset.mimeType ?? 'image/jpeg';
-    if (!allowedMimeTypes.has(mimeType)) { setError('Alege o imagine JPEG, PNG, WebP, HEIC sau HEIF.'); return; }
-    uploadMutation.mutate({ file: asset.file, mimeType, name: asset.fileName ?? `avatar.${mimeType.split('/')[1]}`, uri: asset.uri }, { onError: (uploadError) => setError(getProfileErrorMessage(uploadError, 'Avatarul nu a putut fi încărcat.')) });
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Acces necesar', 'Permite accesul la fotografii pentru a schimba avatarul.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        mediaTypes: ['images'],
+        quality: 0.82,
+      });
+      if (result.canceled || !result.assets[0]) return;
+
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+        setError('Imaginea trebuie să aibă maximum 5 MB.');
+        return;
+      }
+
+      const mimeType = normalizeAvatarMimeType(asset.mimeType, asset.uri);
+      if (!mimeType) {
+        setError('Alege o imagine JPEG, PNG, WebP, HEIC sau HEIF.');
+        return;
+      }
+
+      uploadMutation.mutate({
+        file: asset.file,
+        mimeType,
+        name: avatarFileName(asset.fileName, mimeType),
+        uri: asset.uri,
+      }, {
+        onError: (uploadError) => setError(getProfileErrorMessage(uploadError, 'Avatarul nu a putut fi încărcat. Încearcă din nou.')),
+      });
+    } catch {
+      setError('Galeria foto nu a putut fi deschisă. Încearcă din nou.');
+    }
   };
 
   const save = () => {
@@ -55,13 +103,44 @@ export function EditProfileScreen() {
       {profileQuery.isLoading ? <ActivityIndicator className="mt-16" color={colors.gold} /> : profileQuery.isError || !profileQuery.data ? <Text className="mt-12 text-center font-inter text-ora-secondary">Profilul nu a putut fi încărcat.</Text> : <>
         <View className="mt-8 items-center">
           <PremiumPressable accessibilityLabel="Schimbă fotografia de profil" onPress={busy ? undefined : pickAvatar}>
-            <View><UserAvatar avatarUrl={profileQuery.data.avatarUrl} size={116} /><View className="absolute -bottom-1 -right-1 h-10 w-10 items-center justify-center rounded-full border-2 border-ora-background bg-ora-gold">{uploadMutation.isPending ? <ActivityIndicator color={colors.iconBackground} size="small" /> : <ImagePlus color={colors.iconBackground} size={20} />}</View></View>
+            <View><UserAvatar avatarUrl={profileQuery.data.avatarUrl} name={profileQuery.data.fullName} size={116} /><View className="absolute -bottom-1 -right-1 h-10 w-10 items-center justify-center rounded-full border-2 border-ora-background bg-ora-gold">{uploadMutation.isPending ? <ActivityIndicator color={colors.iconBackground} size="small" /> : <ImagePlus color={colors.iconBackground} size={20} />}</View></View>
           </PremiumPressable>
           {profileQuery.data.avatarUrl ? <PremiumPressable accessibilityLabel="Elimină fotografia de profil" className="mt-4" onPress={() => removeMutation.mutate(undefined, { onError: (removeError) => setError(getProfileErrorMessage(removeError, 'Avatarul nu a putut fi eliminat.')) })}><View className="flex-row items-center"><Trash2 color="#E4574E" size={17} /><Text className="ml-2 font-inter-medium text-sm text-[#E4574E]">Elimină fotografia</Text></View></PremiumPressable> : null}
         </View>
         <View className="mt-9 gap-5">
-          <View><Text className="mb-2 font-inter-medium text-sm text-ora-secondary">Nume</Text><TextInput accessibilityLabel="Nume" className="h-14 rounded-2xl border border-ora-divider bg-ora-surface px-4 font-inter text-base text-ora-primary" maxLength={80} onChangeText={setFullName} value={fullName} /></View>
-          <View><Text className="mb-2 font-inter-medium text-sm text-ora-secondary">Telefon</Text><TextInput accessibilityLabel="Telefon" className="h-14 rounded-2xl border border-ora-divider bg-ora-surface px-4 font-inter text-base text-ora-primary" keyboardType="phone-pad" maxLength={12} onChangeText={(value) => setPhone(`+${value.replace(/\D/g, '').slice(0, 11)}`)} value={phone} /></View>
+            <View>
+                <Text className="mb-2 font-inter-medium text-sm text-ora-secondary">
+                    Nume
+                </Text>
+
+                <View className="h-14 justify-center rounded-2xl border border-ora-divider bg-ora-surface px-4">
+                    <TextInput
+                        accessibilityLabel="Nume"
+                        maxLength={80}
+                        onChangeText={setFullName}
+                        value={fullName}
+                        className="p-0 font-inter text-base leading-5 text-ora-primary"
+                    />
+                </View>
+            </View>
+            <View>
+                <Text className="mb-2 font-inter-medium text-sm text-ora-secondary">
+                    Telefon
+                </Text>
+
+                <View className="h-14 justify-center rounded-2xl border border-ora-divider bg-ora-surface px-4">
+                    <TextInput
+                        accessibilityLabel="Telefon"
+                        keyboardType="phone-pad"
+                        maxLength={12}
+                        onChangeText={(value) =>
+                            setPhone(`+${value.replace(/\D/g, '').slice(0, 11)}`)
+                        }
+                        value={phone}
+                        className="p-0 font-inter text-base leading-5 text-ora-primary"
+                    />
+                </View>
+            </View>
           {error ? <Text accessibilityRole="alert" className="text-center font-inter text-sm text-ora-error">{error}</Text> : null}
           <PremiumPressable accessibilityLabel="Salvează profilul" onPress={busy ? undefined : save}><View className={`h-14 items-center justify-center rounded-2xl bg-ora-gold ${busy ? 'opacity-60' : ''}`}>{updateMutation.isPending ? <ActivityIndicator color={colors.iconBackground} /> : <Text className="font-inter-semibold text-base text-ora-dark">Salvează modificările</Text>}</View></PremiumPressable>
           <PremiumPressable accessibilityLabel="Schimbă PIN-ul" onPress={() => router.navigate('/profile/change-pin')}><View className="h-14 flex-row items-center rounded-2xl border border-ora-divider bg-ora-surface px-4"><LockKeyhole color={colors.gold} size={20} /><Text className="ml-3 font-inter-medium text-base text-ora-primary">Schimbă PIN-ul</Text></View></PremiumPressable>

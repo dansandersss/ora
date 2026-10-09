@@ -1,12 +1,13 @@
 import { Redirect, Tabs, usePathname } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Image,
-    StyleSheet,
     View,
 } from 'react-native';
 
+import { PremiumAnimatedBackground } from '@/components/backgrounds/PremiumAnimatedBackground';
+import { GlassBlurProvider } from '@/components/ui/GlassSurface';
 import {
     authQueryKeys,
     restoreSession,
@@ -15,6 +16,10 @@ import type { AuthUser } from '@/features/auth/types';
 import { AnimatedTabBar } from '@/features/home/components/AnimatedTabBar';
 import { ActiveTabProvider } from '@/features/home/components/TabContentTransition';
 import { NotificationController } from '@/features/notifications/components/NotificationController';
+import { pointsQueryKeys } from '@/features/points/hooks/use-points';
+import { profileQueryKeys } from '@/features/profile/hooks/use-profile';
+import { gamingSessionQueryKeys } from '@/features/sessions/hooks/use-current-gaming-session';
+import { getCurrentGamingSession, getPointsBalance, getProfile } from '@/lib/backend';
 import { queryClient } from '@/lib/query-client';
 import { colors } from '@/theme/tokens';
 
@@ -54,6 +59,15 @@ export default function AuthenticatedTabsLayout() {
         };
     }, [user]);
 
+    useEffect(() => {
+        if (!user) return;
+        Promise.all([
+            queryClient.prefetchQuery({ queryFn: getCurrentGamingSession, queryKey: gamingSessionQueryKeys.current }),
+            queryClient.prefetchQuery({ queryFn: getPointsBalance, queryKey: pointsQueryKeys.balance }),
+            queryClient.prefetchQuery({ queryFn: getProfile, queryKey: profileQueryKeys.detail }),
+        ]).catch(() => undefined);
+    }, [user]);
+
     if (checkingSession) {
         return (
             <View className="flex-1 items-center justify-center bg-[#000]">
@@ -68,54 +82,24 @@ export default function AuthenticatedTabsLayout() {
 
     return (
         <View className="relative flex-1 bg-[#000]">
-            {/* =====================================================
-          GLOBAL APP BACKGROUND
-      ===================================================== */}
-
-            <View
-                pointerEvents="none"
-                style={StyleSheet.absoluteFill}
-            >
-                {/* Main global background */}
-                <View
-                    style={[
-                        StyleSheet.absoluteFill,
-                        {
-                            backgroundColor: '#1E1E21',
-                        },
-                    ]}
-                />
-
-                {/* Global repeating noise */}
-                <Image
-                    source={require('../../../assets/images/noise.png')}
-                    resizeMode="repeat"
-                    style={[
-                        StyleSheet.absoluteFill,
-                        {
-                            opacity: 0.12,
-                        },
-                    ]}
-                />
-            </View>
-
-            {/* =====================================================
-          APP CONTENT
-      ===================================================== */}
-
-            <NotificationController>
+            <StatusBar style="light" />
+            <GlassBlurProvider>
+              <PremiumAnimatedBackground />
+              <NotificationController>
                 <ActiveTabProvider value={activeTab}>
                     <Tabs
                         backBehavior="none"
                         initialRouteName="home"
                         tabBar={(props) => <AnimatedTabBar {...props} />}
                         screenOptions={{
+                            freezeOnBlur: true,
                             headerShown: false,
+                            lazy: false,
 
                             // CRITICAL:
                             // the global background belongs to this layout.
                             sceneStyle: {
-                                backgroundColor: 'transparent',
+                                backgroundColor: '#080808',
                             },
 
                             tabBarHideOnKeyboard: true,
@@ -161,7 +145,8 @@ export default function AuthenticatedTabsLayout() {
                         />
                     </Tabs>
                 </ActiveTabProvider>
-            </NotificationController>
+              </NotificationController>
+            </GlassBlurProvider>
         </View>
     );
 }
